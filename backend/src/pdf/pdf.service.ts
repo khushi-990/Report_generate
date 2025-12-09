@@ -158,43 +158,99 @@ export class PdfService {
 
     const leftX = margin;
     const rightX = 300;
-    let currentY = 120;
+    const sectionStartY = 120;
+    let currentY = sectionStartY;
+    
+    const leftBoxStartX = leftX;
+    const leftBoxEndX = rightX - 10;
+    const rightBoxStartX = rightX;
+    const rightBoxEndX = pageWidth - margin;
+    
+    let leftBoxEndY = sectionStartY;
+    let rightBoxEndY = sectionStartY;
     
     doc.fontSize(10).font('Helvetica-Bold');
-    doc.text('To:', leftX, currentY);
+    doc.text('To:', leftX + 5, currentY + 5);
     doc.fontSize(10).font('Helvetica');
-    currentY += 20;
+    currentY += 18;
+    leftBoxEndY = currentY;
     
-    doc.text(data.clientName || '', leftX, currentY);
-    currentY += 15;
+    if (data.clientName) {
+      doc.text(data.clientName || '', leftX + 5, currentY);
+      currentY += 15;
+      leftBoxEndY = currentY;
+    }
     
-    doc.text(data.address || '', leftX, currentY);
-    currentY += 15;
+    if (data.address) {
+      const addressHeight = doc.heightOfString(data.address || '', { width: leftBoxEndX - leftX - 10 });
+      doc.text(data.address || '', leftX + 5, currentY, { width: leftBoxEndX - leftX - 10 });
+      currentY += Math.max(addressHeight, 15);
+      leftBoxEndY = currentY;
+    }
     
-    doc.text(`GST No.: ${data.gstNo || ''}`, leftX, currentY);
-    currentY += 15;
+    if (data.gstNo) {
+      doc.text(`GST No.: ${data.gstNo || ''}`, leftX + 5, currentY);
+      currentY += 15;
+      leftBoxEndY = currentY;
+    }
     
-    doc.text(`City: ${data.city || ''}`, leftX, currentY);
+    if (data.city) {
+      doc.text(`City: ${data.city || ''}`, leftX + 5, currentY);
+      currentY += 15;
+      leftBoxEndY = currentY;
+    }
+    
+    leftBoxEndY = currentY + 5;
 
-    currentY = 120;
+    currentY = sectionStartY;
     doc.fontSize(10).font('Helvetica');
     if (data.contactName) {
-      doc.text(`Contact name: ${data.contactName}`, rightX, currentY);
+      doc.text(`Contact name: ${data.contactName}`, rightX + 5, currentY + 5);
       currentY += 15;
+      rightBoxEndY = currentY;
     }
     if (data.contactNo) {
-      doc.text(`Contact No.: ${data.contactNo}`, rightX, currentY);
+      doc.text(`Contact No.: ${data.contactNo}`, rightX + 5, currentY + 5);
       currentY += 15;
+      rightBoxEndY = currentY;
     }
-    doc.text(`Client: ${data.client || ''}`, rightX, currentY);
-    currentY += 15;
-    doc.text(`Ref. No. & Date: ${data.refNo || ''} Dtd: ${currentDate}`, rightX, currentY);
+    if (data.client) {
+      doc.text(`Client: ${data.client || ''}`, rightX + 5, currentY + 5);
+      currentY += 15;
+      rightBoxEndY = currentY;
+    }
+    
+    const refNoText = `Ref. No. & Date: ${data.refNo || ''} Dtd: ${currentDate}`;
+    const refNoHeight = doc.heightOfString(refNoText, { width: rightBoxEndX - rightX - 10 });
+    doc.text(refNoText, rightX + 5, currentY + 5, { width: rightBoxEndX - rightX - 10 });
+    rightBoxEndY = currentY + Math.max(refNoHeight, 15) + 5;
+    
+    const maxBoxHeight = Math.max(leftBoxEndY - sectionStartY, rightBoxEndY - sectionStartY);
+    const boxEndY = sectionStartY + maxBoxHeight;
+    
+    doc.moveTo(leftBoxStartX, sectionStartY).lineTo(leftBoxEndX, sectionStartY).stroke();
+    doc.moveTo(leftBoxStartX, sectionStartY).lineTo(leftBoxStartX, boxEndY).stroke();
+    doc.moveTo(leftBoxEndX, sectionStartY).lineTo(leftBoxEndX, boxEndY).stroke();
+    doc.moveTo(leftBoxStartX, boxEndY).lineTo(leftBoxEndX, boxEndY).stroke();
+    
+    doc.moveTo(rightBoxStartX, sectionStartY).lineTo(rightBoxEndX, sectionStartY).stroke();
+    doc.moveTo(rightBoxStartX, sectionStartY).lineTo(rightBoxStartX, boxEndY).stroke();
+    doc.moveTo(rightBoxEndX, sectionStartY).lineTo(rightBoxEndX, boxEndY).stroke();
+    doc.moveTo(rightBoxStartX, boxEndY).lineTo(rightBoxEndX, boxEndY).stroke();
 
-    const nameOfWorkY = 220;
+    const nameOfWorkY = boxEndY + 20;
+    const nameOfWorkStartY = nameOfWorkY;
     doc.fontSize(10).font('Helvetica-Bold');
-    doc.text('Name of Work:', margin, nameOfWorkY);
+    doc.text('Name of Work:', margin + 5, nameOfWorkY + 5);
     doc.fontSize(10).font('Helvetica');
-    doc.text(data.nameOfWork || '', margin, nameOfWorkY + 20, { width: 500 });
+    const nameOfWorkLines = doc.heightOfString(data.nameOfWork || '', { width: 500 });
+    doc.text(data.nameOfWork || '', margin + 5, nameOfWorkY + 25, { width: 500 });
+    const nameOfWorkEndY = nameOfWorkY + 25 + nameOfWorkLines + 10;
+    
+    doc.moveTo(margin, nameOfWorkStartY).lineTo(pageWidth - margin, nameOfWorkStartY).stroke();
+    doc.moveTo(margin, nameOfWorkStartY).lineTo(margin, nameOfWorkEndY).stroke();
+    doc.moveTo(pageWidth - margin, nameOfWorkStartY).lineTo(pageWidth - margin, nameOfWorkEndY).stroke();
+    doc.moveTo(margin, nameOfWorkEndY).lineTo(pageWidth - margin, nameOfWorkEndY).stroke();
 
     const tableStartX = margin;
     const tableEndX = pageWidth - margin;
@@ -205,7 +261,7 @@ export class PdfService {
     const col5X = 310;
     const col6X = 375;
     const col7X = 455;
-    const headerY = 280;
+    const headerY = nameOfWorkEndY + 20;
     const headerRowHeight = 20;
 
     doc.fontSize(10).font('Helvetica-Bold');
@@ -336,27 +392,59 @@ export class PdfService {
     const cgstAmount = (afterDiscount * cgst) / 100;
     const total = Math.max(0, afterDiscount + sgstAmount + cgstAmount);
 
-    yPos = 600;
+    const summaryStartY = yPos + 20;
+    const summaryRightX = pageWidth - margin;
+    const summaryLeftX = summaryRightX - 180;
+
     doc.fontSize(10).font('Helvetica');
-    doc.text(`In Words: RUPEES ${this.numberToWords(total)}`, margin, yPos);
-    doc.text(`Sub Total: ${subTotal.toFixed(2)}`, 400, yPos);
-    doc.text(`${discount}% Discount: ${discountAmount.toFixed(2)}`, 400, yPos + 20);
-    doc.text(`${sgst}% SGST: ${sgstAmount.toFixed(2)}`, 400, yPos + 40);
-    doc.text(`${cgst}% CGST: ${cgstAmount.toFixed(2)}`, 400, yPos + 60);
+    const subTotalText = `Sub Total:`;
+    const subTotalValue = `${subTotal.toFixed(2)}`;
+    doc.text(subTotalText, summaryLeftX, summaryStartY);
+    doc.text(subTotalValue, summaryRightX - doc.widthOfString(subTotalValue), summaryStartY);
+    
+    const discountText = `${discount}% Discount:`;
+    const discountValue = `${discountAmount.toFixed(2)}`;
+    doc.text(discountText, summaryLeftX, summaryStartY + 20);
+    doc.text(discountValue, summaryRightX - doc.widthOfString(discountValue), summaryStartY + 20);
+    
+    const sgstText = `${sgst}% SGST:`;
+    const sgstValue = `${sgstAmount.toFixed(2)}`;
+    doc.text(sgstText, summaryLeftX, summaryStartY + 40);
+    doc.text(sgstValue, summaryRightX - doc.widthOfString(sgstValue), summaryStartY + 40);
+    
+    const cgstText = `${cgst}% CGST:`;
+    const cgstValue = `${cgstAmount.toFixed(2)}`;
+    doc.text(cgstText, summaryLeftX, summaryStartY + 60);
+    doc.text(cgstValue, summaryRightX - doc.widthOfString(cgstValue), summaryStartY + 60);
+    
     doc.fontSize(12).font('Helvetica-Bold');
-    doc.text(`Total Rs: ${total.toFixed(0)}`, 400, yPos + 80);
+    const totalText = `Total Rs:`;
+    const totalValue = `${total.toFixed(0)}`;
+    doc.text(totalText, summaryLeftX, summaryStartY + 85);
+    doc.text(totalValue, summaryRightX - doc.widthOfString(totalValue), summaryStartY + 85);
 
+    const wordsY = summaryStartY;
+    doc.fontSize(10).font('Helvetica');
+    const wordsText = `In Words: RUPEES ${this.numberToWords(total)}`;
+    doc.text(wordsText, margin, wordsY, { width: summaryLeftX - margin - 30 });
+
+    const footerY = 750;
     doc.fontSize(8).font('Helvetica');
-    doc.text('PAN NO. PAN NO: AADCG0367L', margin, 750);
-    doc.text('GST NO: 24AADCG0367L1ZM', margin, 765);
-    doc.text('SERVICE TAX REG. NO: AADCG0367LST001', margin, 780);
-    doc.text('Category of Services:', margin, 795);
-    doc.text('Technical Testing Inspection & Certification', margin, 810);
-    doc.text('Survey and map Making', margin, 825);
+    doc.text('PAN NO.: AADCG0367L', margin, footerY);
+    doc.text('GST NO.: 24AADCG0367L1ZM', margin, footerY + 15);
+    doc.text('SERVICE TAX REG. NO.: AADCG0367LST001', margin, footerY + 30);
+    doc.text('Category of Services:', margin, footerY + 45);
+    doc.text('Technical Testing, Inspection & Certification, Survey and map Making', margin, footerY + 60);
 
+    const companyRightX = pageWidth - margin;
     doc.fontSize(10).font('Helvetica-Bold');
-    doc.text('GEO DESIGNS & RESEARCH PVT LTD', 350, 750);
-    doc.text('Authorised Signatory', 350, 770);
+    const companyName = 'GEO DESIGNS & RESEARCH PVT LTD';
+    const companyNameWidth = doc.widthOfString(companyName);
+    doc.text(companyName, companyRightX - companyNameWidth, footerY);
+    doc.fontSize(10).font('Helvetica');
+    const signatoryText = 'Authorised Signatory';
+    const signatoryWidth = doc.widthOfString(signatoryText);
+    doc.text(signatoryText, companyRightX - signatoryWidth, footerY + 20);
 
     doc.fontSize(8).font('Helvetica');
     doc.text(invoiceNo, 50, 820);

@@ -75,28 +75,34 @@ export default function ReportForm() {
     };
     loadConfig();
     fetchReports();
-    const interval = setInterval(() => {
-      fetchPaginationConfig();
-    }, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (configLoaded && pageSize > 0) {
       const calculatedPages = rows.length > 0 ? Math.ceil(rows.length / pageSize) : 1;
-      setTotalPages(calculatedPages);
+      setTotalPages((prevPages) => {
+        if (prevPages !== calculatedPages) {
+          return calculatedPages;
+        }
+        return prevPages;
+      });
     }
   }, [rows.length, pageSize, configLoaded]);
 
   useEffect(() => {
-    if (configLoaded && totalPages > 0 && prevTotalPagesRef.current !== totalPages) {
-      prevTotalPagesRef.current = totalPages;
-      setCurrentPage((prevCurrentPage) => {
-        if (prevCurrentPage > totalPages) {
-          return totalPages;
-        }
-        return prevCurrentPage;
-      });
+    if (configLoaded && totalPages > 0) {
+      const prevTotalPages = prevTotalPagesRef.current;
+      if (prevTotalPages > 0 && prevTotalPages !== totalPages) {
+        prevTotalPagesRef.current = totalPages;
+        setCurrentPage((prevCurrentPage) => {
+          if (prevCurrentPage > totalPages && totalPages > 0) {
+            return totalPages;
+          }
+          return prevCurrentPage;
+        });
+      } else if (prevTotalPages === 0) {
+        prevTotalPagesRef.current = totalPages;
+      }
     }
   }, [totalPages, configLoaded]);
 
@@ -118,6 +124,8 @@ export default function ReportForm() {
               return prevCurrentPage;
             });
           }
+        } else if (!configLoaded && response.data.currentPage !== undefined) {
+          setCurrentPage(Number(response.data.currentPage) || 1);
         }
       }
     } catch (error) {
@@ -129,7 +137,22 @@ export default function ReportForm() {
     try {
       const response = await axios.get('http://localhost:3001/pdf/reports');
       if (response.data && response.data.length > 0) {
-        setRows(response.data);
+        setRows((prevRows) => {
+          const newRows = response.data;
+          if (prevRows.length !== newRows.length) {
+            const newTotalPages = Math.ceil(newRows.length / pageSize);
+            setCurrentPage((prevCurrentPage) => {
+              if (prevCurrentPage > newTotalPages && newTotalPages > 0) {
+                return newTotalPages;
+              }
+              return prevCurrentPage;
+            });
+          }
+          return newRows;
+        });
+      } else {
+        setRows([]);
+        setCurrentPage(1);
       }
     } catch (error) {
       console.error('Error fetching reports:', error);
@@ -150,7 +173,6 @@ export default function ReportForm() {
 
   const addRow = () => {
     setRows([
-      ...rows,
       {
         clientCode: '',
         jobNo: '',
@@ -172,7 +194,9 @@ export default function ReportForm() {
         refNo: '',
         userDownloadedPdf: false,
       },
+      ...rows,
     ]);
+    setCurrentPage(1);
   };
 
   const updateRow = (index: number, field: keyof FormData, value: any) => {
