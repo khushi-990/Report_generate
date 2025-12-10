@@ -137,120 +137,117 @@ export class PdfService {
     const reportDate = data.reportDate ? this.formatDate(data.reportDate) : this.formatDate(new Date().toISOString());
     const jobNo = data.jobNo || '';
     const clientCode = data.clientCode || '';
-    const combinedJobNo = clientCode ? `${clientCode}/${jobNo}` : jobNo;
-    const invoiceNo = jobNo ? `BRD/${jobNo}` : 'BRD/';
+    const combinedJobNo = clientCode && jobNo ? `${clientCode}/${jobNo}` : (jobNo || clientCode);
+    const reportNo = data.reportNo || '';
+    const finalInvoiceNo = reportNo ? `BRD/${reportNo}` : (jobNo ? `BRD/${jobNo}` : 'BRD/');
 
     const pageWidth = 595;
     const margin = 50;
+    const topY = 50;
     
     doc.fontSize(16).font('Helvetica-Bold');
     const invoiceTitleWidth = doc.widthOfString('PERFORMA INVOICE');
-    doc.text('PERFORMA INVOICE', (pageWidth - invoiceTitleWidth) / 2, 50);
+    const titleY = topY;
+    doc.text('PERFORMA INVOICE', (pageWidth - invoiceTitleWidth) / 2, titleY);
+    doc.moveTo((pageWidth - invoiceTitleWidth) / 2, titleY + 15).lineTo((pageWidth - invoiceTitleWidth) / 2 + invoiceTitleWidth, titleY + 15).stroke();
+    
+    const unifiedTableStartY = topY + 25;
+    const unifiedTableStartX = margin;
+    const unifiedTableEndX = pageWidth - margin;
+    const unifiedTableMidX = pageWidth / 2;
+    const cellPadding = 5;
+    let currentUnifiedY = unifiedTableStartY;
     
     doc.fontSize(10).font('Helvetica');
-    doc.text(`No: ${invoiceNo}`, margin, 50);
-    doc.text(`Date: ${currentDate}`, margin, 65);
     
-    const jobNoWidth = doc.widthOfString(`Job No.: ${combinedJobNo}`);
-    doc.text(`Job No.: ${combinedJobNo}`, pageWidth - margin - jobNoWidth, 50);
-    const reportDateWidth = doc.widthOfString(`Report Date: ${reportDate}`);
-    doc.text(`Report Date: ${reportDate}`, pageWidth - margin - reportDateWidth, 65);
-
+    const unifiedHeaderRowHeight = 15;
+    const firstRowY = currentUnifiedY + cellPadding;
+    const secondRowY = currentUnifiedY + unifiedHeaderRowHeight + cellPadding;
+    
+    doc.text(`No: ${finalInvoiceNo}`, unifiedTableStartX + cellPadding, firstRowY);
+    doc.text(`Job No.: ${combinedJobNo}`, unifiedTableMidX + cellPadding, firstRowY);
+    doc.text(`Date: ${currentDate}`, unifiedTableStartX + cellPadding, secondRowY);
+    doc.text(`Report Date: ${reportDate}`, unifiedTableMidX + cellPadding, secondRowY);
+    
+    currentUnifiedY += (unifiedHeaderRowHeight * 2);
+    
     const leftX = margin;
     const rightX = 300;
-    const sectionStartY = 120;
-    let currentY = sectionStartY;
+    const toContactStartY = currentUnifiedY;
+    let tempY = toContactStartY;
     
     const leftBoxStartX = leftX;
     const leftBoxEndX = rightX - 10;
     const rightBoxStartX = rightX;
     const rightBoxEndX = pageWidth - margin;
     
-    let leftBoxEndY = sectionStartY;
-    let rightBoxEndY = sectionStartY;
-    
     doc.fontSize(10).font('Helvetica-Bold');
-    doc.text('To:', leftX + 5, currentY + 5);
+    doc.text('To:', leftX + cellPadding, tempY + cellPadding);
     doc.fontSize(10).font('Helvetica');
-    currentY += 18;
-    leftBoxEndY = currentY;
+    tempY += 15;
     
     if (data.clientName) {
-      doc.text(data.clientName || '', leftX + 5, currentY);
-      currentY += 15;
-      leftBoxEndY = currentY;
+      doc.text(data.clientName || '', leftX + cellPadding, tempY);
+      tempY += 15;
     }
     
     if (data.address) {
-      const addressHeight = doc.heightOfString(data.address || '', { width: leftBoxEndX - leftX - 10 });
-      doc.text(data.address || '', leftX + 5, currentY, { width: leftBoxEndX - leftX - 10 });
-      currentY += Math.max(addressHeight, 15);
-      leftBoxEndY = currentY;
+      const addressHeight = doc.heightOfString(data.address || '', { width: leftBoxEndX - leftX - (cellPadding * 2) });
+      doc.text(data.address || '', leftX + cellPadding, tempY, { width: leftBoxEndX - leftX - (cellPadding * 2) });
+      tempY += Math.max(addressHeight, 15);
     }
     
     if (data.gstNo) {
-      doc.text(`GST No.: ${data.gstNo || ''}`, leftX + 5, currentY);
-      currentY += 15;
-      leftBoxEndY = currentY;
+      doc.text(`GST No.: ${data.gstNo || ''}`, leftX + cellPadding, tempY);
+      tempY += 15;
     }
     
     if (data.city) {
-      doc.text(`City: ${data.city || ''}`, leftX + 5, currentY);
-      currentY += 15;
-      leftBoxEndY = currentY;
+      doc.text(`City: ${data.city || ''}`, leftX + cellPadding, tempY);
+      tempY += 15;
     }
     
-    leftBoxEndY = currentY + 5;
-
-    currentY = sectionStartY;
-    doc.fontSize(10).font('Helvetica');
+    const leftBoxEndY = tempY + cellPadding;
+    
+    tempY = toContactStartY;
     if (data.contactName) {
-      doc.text(`Contact name: ${data.contactName}`, rightX + 5, currentY + 5);
-      currentY += 15;
-      rightBoxEndY = currentY;
+      doc.text(`Contact name: ${data.contactName}`, rightX + cellPadding, tempY + cellPadding);
+      tempY += 15;
     }
     if (data.contactNo) {
-      doc.text(`Contact No.: ${data.contactNo}`, rightX + 5, currentY + 5);
-      currentY += 15;
-      rightBoxEndY = currentY;
+      doc.text(`Contact No.: ${data.contactNo}`, rightX + cellPadding, tempY + cellPadding);
+      tempY += 15;
     }
     if (data.client) {
-      doc.text(`Client: ${data.client || ''}`, rightX + 5, currentY + 5);
-      currentY += 15;
-      rightBoxEndY = currentY;
+      doc.text(`Client: ${data.client || ''}`, rightX + cellPadding, tempY + cellPadding);
+      tempY += 15;
     }
     
-    const refNoText = `Ref. No. & Date: ${data.refNo || ''} Dtd: ${currentDate}`;
-    const refNoHeight = doc.heightOfString(refNoText, { width: rightBoxEndX - rightX - 10 });
-    doc.text(refNoText, rightX + 5, currentY + 5, { width: rightBoxEndX - rightX - 10 });
-    rightBoxEndY = currentY + Math.max(refNoHeight, 15) + 5;
+    const refNoText = data.refNo ? `Ref. No. & Date: ${data.refNo} Dtd: ${currentDate}` : `Ref. No. & Date: Dtd: ${currentDate}`;
+    const refNoHeight = doc.heightOfString(refNoText, { width: rightBoxEndX - rightX - (cellPadding * 2) });
+    doc.text(refNoText, rightX + cellPadding, tempY + cellPadding, { width: rightBoxEndX - rightX - (cellPadding * 2) });
+    const rightBoxEndY = tempY + Math.max(refNoHeight, 15) + cellPadding;
     
-    const maxBoxHeight = Math.max(leftBoxEndY - sectionStartY, rightBoxEndY - sectionStartY);
-    const boxEndY = sectionStartY + maxBoxHeight;
+    const maxBoxHeight = Math.max(leftBoxEndY - toContactStartY, rightBoxEndY - toContactStartY);
+    currentUnifiedY = toContactStartY + maxBoxHeight;
     
-    doc.moveTo(leftBoxStartX, sectionStartY).lineTo(leftBoxEndX, sectionStartY).stroke();
-    doc.moveTo(leftBoxStartX, sectionStartY).lineTo(leftBoxStartX, boxEndY).stroke();
-    doc.moveTo(leftBoxEndX, sectionStartY).lineTo(leftBoxEndX, boxEndY).stroke();
-    doc.moveTo(leftBoxStartX, boxEndY).lineTo(leftBoxEndX, boxEndY).stroke();
-    
-    doc.moveTo(rightBoxStartX, sectionStartY).lineTo(rightBoxEndX, sectionStartY).stroke();
-    doc.moveTo(rightBoxStartX, sectionStartY).lineTo(rightBoxStartX, boxEndY).stroke();
-    doc.moveTo(rightBoxEndX, sectionStartY).lineTo(rightBoxEndX, boxEndY).stroke();
-    doc.moveTo(rightBoxStartX, boxEndY).lineTo(rightBoxEndX, boxEndY).stroke();
-
-    const nameOfWorkY = boxEndY + 20;
-    const nameOfWorkStartY = nameOfWorkY;
+    const nameOfWorkStartY = currentUnifiedY;
     doc.fontSize(10).font('Helvetica-Bold');
-    doc.text('Name of Work:', margin + 5, nameOfWorkY + 5);
+    doc.text('Name of Work:', margin + cellPadding, nameOfWorkStartY + cellPadding);
     doc.fontSize(10).font('Helvetica');
-    const nameOfWorkLines = doc.heightOfString(data.nameOfWork || '', { width: 500 });
-    doc.text(data.nameOfWork || '', margin + 5, nameOfWorkY + 25, { width: 500 });
-    const nameOfWorkEndY = nameOfWorkY + 25 + nameOfWorkLines + 10;
+    const nameOfWorkLines = doc.heightOfString(data.nameOfWork || '', { width: pageWidth - margin * 2 - (cellPadding * 2) });
+    doc.text(data.nameOfWork || '', margin + cellPadding, nameOfWorkStartY + cellPadding + 15, { width: pageWidth - margin * 2 - (cellPadding * 2) });
+    const unifiedTableEndY = nameOfWorkStartY + cellPadding + 15 + nameOfWorkLines + cellPadding;
     
-    doc.moveTo(margin, nameOfWorkStartY).lineTo(pageWidth - margin, nameOfWorkStartY).stroke();
-    doc.moveTo(margin, nameOfWorkStartY).lineTo(margin, nameOfWorkEndY).stroke();
-    doc.moveTo(pageWidth - margin, nameOfWorkStartY).lineTo(pageWidth - margin, nameOfWorkEndY).stroke();
-    doc.moveTo(margin, nameOfWorkEndY).lineTo(pageWidth - margin, nameOfWorkEndY).stroke();
+    doc.moveTo(unifiedTableMidX, unifiedTableStartY).lineTo(unifiedTableMidX, unifiedTableEndY).stroke();
+    doc.moveTo(unifiedTableStartX, unifiedTableStartY + (unifiedHeaderRowHeight * 2)).lineTo(unifiedTableEndX, unifiedTableStartY + (unifiedHeaderRowHeight * 2)).stroke();
+    doc.moveTo(unifiedTableStartX, unifiedTableStartY + (unifiedHeaderRowHeight * 1)).lineTo(unifiedTableEndX, unifiedTableStartY + (unifiedHeaderRowHeight * 1)).stroke();
+    doc.moveTo(rightX, toContactStartY).lineTo(rightX, nameOfWorkStartY).stroke();
+    doc.moveTo(unifiedTableStartX, nameOfWorkStartY).lineTo(unifiedTableEndX, nameOfWorkStartY).stroke();
+    doc.moveTo(unifiedTableStartX, unifiedTableStartY).lineTo(unifiedTableStartX, unifiedTableEndY).stroke();
+    doc.moveTo(unifiedTableEndX, unifiedTableStartY).lineTo(unifiedTableEndX, unifiedTableEndY).stroke();
+    doc.moveTo(unifiedTableStartX, unifiedTableStartY).lineTo(unifiedTableEndX, unifiedTableStartY).stroke();
+    doc.moveTo(unifiedTableStartX, unifiedTableEndY).lineTo(unifiedTableEndX, unifiedTableEndY).stroke();
 
     const tableStartX = margin;
     const tableEndX = pageWidth - margin;
@@ -261,7 +258,7 @@ export class PdfService {
     const col5X = 310;
     const col6X = 375;
     const col7X = 455;
-    const headerY = nameOfWorkEndY + 20;
+    const headerY = unifiedTableEndY;
     const headerRowHeight = 20;
 
     doc.fontSize(10).font('Helvetica-Bold');
@@ -273,7 +270,6 @@ export class PdfService {
     doc.text('Rate(inc. ST)', col6X + 5, headerY + 10, { width: col7X - col6X - 10 });
     doc.text('Amount(Rs)', col7X + 5, headerY + 10, { width: tableEndX - col7X - 10 });
 
-    doc.moveTo(tableStartX, headerY).lineTo(tableEndX, headerY).stroke();
     doc.moveTo(col1X, headerY).lineTo(col1X, headerY + headerRowHeight).stroke();
     doc.moveTo(col2X, headerY).lineTo(col2X, headerY + headerRowHeight).stroke();
     doc.moveTo(col3X, headerY).lineTo(col3X, headerY + headerRowHeight).stroke();
@@ -318,8 +314,12 @@ export class PdfService {
           const srNoCenterY = materialCenterY;
           
           doc.fontSize(9).font('Helvetica');
-          doc.text(`${srNo}`, col1X + 5, srNoCenterY - 3, { width: col2X - col1X - 10 });
-          doc.text(material.material || '', col2X + 5, materialCenterY - 3, { width: col3X - col2X - 10 });
+          doc.text(`${srNo}`, col1X + 5, srNoCenterY - 5, { width: col2X - col1X - 10, align: 'center' });
+          doc.text(material.material || '', col2X + 5, materialCenterY - 5, { width: col3X - col2X - 10, align: 'center' });
+          
+          doc.moveTo(col1X, materialStartY).lineTo(col1X, materialEndY).stroke();
+          doc.moveTo(col2X, materialStartY).lineTo(col2X, materialEndY).stroke();
+          doc.moveTo(tableStartX, materialStartY).lineTo(tableStartX, materialEndY).stroke();
           
           material.tests.forEach((test: string, testIndex: number) => {
             const rowStartY = materialStartY + (testIndex * 20);
@@ -327,8 +327,6 @@ export class PdfService {
             
             if (testIndex === 0) {
               doc.moveTo(tableStartX, rowStartY).lineTo(tableEndX, rowStartY).stroke();
-            } else {
-              doc.moveTo(col3X, rowStartY).lineTo(tableEndX, rowStartY).stroke();
             }
             
             doc.moveTo(col3X, rowStartY).lineTo(col3X, rowEndY).stroke();
@@ -337,16 +335,10 @@ export class PdfService {
             doc.moveTo(col6X, rowStartY).lineTo(col6X, rowEndY).stroke();
             doc.moveTo(col7X, rowStartY).lineTo(col7X, rowEndY).stroke();
             doc.moveTo(tableEndX, rowStartY).lineTo(tableEndX, rowEndY).stroke();
-            
-            if (testIndex === material.tests.length - 1) {
-              doc.moveTo(tableStartX, rowEndY).lineTo(tableEndX, rowEndY).stroke();
-            } else {
-              doc.moveTo(col3X, rowEndY).lineTo(tableEndX, rowEndY).stroke();
-            }
+            doc.moveTo(col3X, rowEndY).lineTo(tableEndX, rowEndY).stroke();
           });
           
-          doc.moveTo(tableStartX, materialStartY).lineTo(tableStartX, materialEndY).stroke();
-          doc.moveTo(col2X, materialStartY).lineTo(col2X, materialEndY).stroke();
+          doc.moveTo(tableStartX, materialEndY).lineTo(tableEndX, materialEndY).stroke();
         } else {
           const rowStartY = yPos;
           const rowEndY = yPos + 20;
@@ -447,7 +439,7 @@ export class PdfService {
     doc.text(signatoryText, companyRightX - signatoryWidth, footerY + 20);
 
     doc.fontSize(8).font('Helvetica');
-    doc.text(invoiceNo, 50, 820);
+    doc.text(finalInvoiceNo, 50, 820);
     const pageNumWidth = doc.widthOfString('1 of 1');
     doc.text('1 of 1', pageWidth - 50 - pageNumWidth, 820);
   }
