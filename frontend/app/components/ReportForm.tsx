@@ -67,6 +67,7 @@ export default function ReportForm() {
   const [totalPages, setTotalPages] = useState(1);
   const [configLoaded, setConfigLoaded] = useState(false);
   const prevTotalPagesRef = useRef(1);
+  const [viewPdfId, setViewPdfId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -374,6 +375,7 @@ export default function ReportForm() {
               <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '120px' }}>Materials</th>
               <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'center', fontWeight: 'bold', minWidth: '80px' }}>Edit</th>
               <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'center', fontWeight: 'bold', minWidth: '100px' }}>Complete</th>
+              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'center', fontWeight: 'bold', minWidth: '80px' }}>View PDF</th>
             </tr>
           </thead>
           <tbody>
@@ -553,6 +555,19 @@ export default function ReportForm() {
                       Complete
                     </button>
                   </td>
+                  <td style={{ border: '1px solid #d0d0d0', padding: '6px', textAlign: 'center' }}>
+                    {row.userDownloadedPdf && row._id ? (
+                      <button
+                        onClick={() => setViewPdfId(row._id!)}
+                        style={{ padding: '6px 12px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', margin: '0 auto' }}
+                        title="View PDF"
+                      >
+                        <span style={{ fontSize: '14px' }}>👁️</span> View
+                      </button>
+                    ) : (
+                      <span style={{ color: '#999', fontSize: '12px' }}>-</span>
+                    )}
+                  </td>
                 </tr>
                 {expandedRow === rowIndex && (
                   <tr>
@@ -657,6 +672,76 @@ export default function ReportForm() {
             })}
           </tbody>
         </table>
+
+        {viewPdfId && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              zIndex: 1000,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+            }}
+            onClick={() => setViewPdfId(null)}
+          >
+            <div
+              style={{
+                backgroundColor: 'white',
+                width: '90%',
+                height: '90%',
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: '8px',
+                overflow: 'hidden',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  padding: '15px',
+                  borderBottom: '1px solid #ddd',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: '#f5f5f5',
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>PDF Preview</h3>
+                <button
+                  onClick={() => setViewPdfId(null)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+              <iframe
+                src={`http://localhost:3001/pdf/view/${viewPdfId}`}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                }}
+                title="PDF Preview"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {rows.length > 0 && (

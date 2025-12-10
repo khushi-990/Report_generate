@@ -97,5 +97,29 @@ export class PdfController {
       );
     }
   }
+
+  @Get('view/:id')
+  async viewPdf(@Param('id') id: string, @Res() res: Response) {
+    try {
+      const report = await this.reportModel.findById(id).exec();
+      if (!report) {
+        throw new HttpException('Report not found', HttpStatus.NOT_FOUND);
+      }
+
+      const reportData = report.toObject();
+      const pdfBuffer = await this.pdfService.generateReport(reportData);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename=report.pdf');
+      res.send(pdfBuffer);
+    } catch (error) {
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: error.message || 'Error generating PDF',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }
 
