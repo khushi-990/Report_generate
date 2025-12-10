@@ -5,7 +5,11 @@ import PDFDocument = require('pdfkit');
 export class PdfService {
   async generateReport(data: any): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const doc = new PDFDocument({ 
+        margin: 50, 
+        size: 'A4',
+        autoFirstPage: true
+      });
       const buffers: Buffer[] = [];
 
       doc.on('data', buffers.push.bind(buffers));
@@ -31,7 +35,9 @@ export class PdfService {
     const combinedJobNo = clientCode ? `BRD/${clientCode}/${jobNo}` : `BRD/${jobNo}`;
     
     const pageWidth = 595;
+    const pageHeight = 842;
     const margin = 50;
+    const maxTableY = 450;
     
     doc.fontSize(10).font('Helvetica');
     const dateWidth = doc.widthOfString(currentDate);
@@ -76,6 +82,10 @@ export class PdfService {
 
     if (data.materials && data.materials.length > 0) {
       data.materials.forEach((material: any, materialIndex: number) => {
+        if (yPos > maxTableY) {
+          return;
+        }
+        
         const rowStartY = yPos;
         let currentY = rowStartY + 5;
         
@@ -93,6 +103,11 @@ export class PdfService {
         }
         
         const rowEndY = currentY + 5;
+        
+        if (rowEndY > maxTableY) {
+          return;
+        }
+        
         const totalRowHeight = rowEndY - rowStartY;
         const centerY = rowStartY + (totalRowHeight / 2);
         
@@ -116,9 +131,10 @@ export class PdfService {
       });
     }
     
-    doc.moveTo(tableStartX, yPos).lineTo(tableEndX, yPos).stroke();
+    const finalTableY = Math.min(yPos, maxTableY);
+    doc.moveTo(tableStartX, finalTableY).lineTo(tableEndX, finalTableY).stroke();
 
-                                const footerY = 470;
+    const footerY = Math.min(470, pageHeight - 50);
     doc.fontSize(10).font('Helvetica');
     
     doc.text('Inward Dt:', margin, footerY);
@@ -142,6 +158,7 @@ export class PdfService {
     const finalInvoiceNo = reportNo ? `BRD/${reportNo}` : (jobNo ? `BRD/${jobNo}` : 'BRD/');
 
     const pageWidth = 595;
+    const pageHeight = 842;
     const margin = 50;
     const topY = 50;
     
@@ -280,18 +297,27 @@ export class PdfService {
     doc.moveTo(tableEndX, headerY).lineTo(tableEndX, headerY + headerRowHeight).stroke();
     doc.moveTo(tableStartX, headerY + headerRowHeight).lineTo(tableEndX, headerY + headerRowHeight).stroke();
 
+    const maxTableY = 580;
     let yPos = headerY + headerRowHeight;
     let srNo = 1;
     let subTotal = 0;
 
     if (data.materials && data.materials.length > 0) {
       data.materials.forEach((material: any) => {
+        if (yPos > maxTableY) {
+          return;
+        }
+        
         const materialStartY = yPos;
         let materialEndY = yPos;
         
         if (material.tests && material.tests.length > 0) {
           const numTests = material.tests.length;
           materialEndY = materialStartY + (numTests * 20);
+          
+          if (materialEndY > maxTableY) {
+            return;
+          }
           
           material.tests.forEach((test: string, testIndex: number) => {
             doc.fontSize(9).font('Helvetica');
@@ -384,7 +410,14 @@ export class PdfService {
     const cgstAmount = (afterDiscount * cgst) / 100;
     const total = Math.max(0, afterDiscount + sgstAmount + cgstAmount);
 
-    const summaryStartY = yPos + 20;
+    const maxContentY = 650;
+    const finalYPos = Math.min(yPos, maxContentY);
+    const summaryStartY = finalYPos + 20;
+    
+    if (summaryStartY > maxContentY) {
+      return;
+    }
+    
     const summaryRightX = pageWidth - margin;
     const summaryLeftX = summaryRightX - 180;
 
@@ -420,28 +453,39 @@ export class PdfService {
     const wordsText = `In Words: RUPEES ${this.numberToWords(total)}`;
     doc.text(wordsText, margin, wordsY, { width: summaryLeftX - margin - 30 });
 
-    const footerY = 750;
-    doc.fontSize(8).font('Helvetica');
-    doc.text('PAN NO.: AADCG0367L', margin, footerY);
-    doc.text('GST NO.: 24AADCG0367L1ZM', margin, footerY + 15);
-    doc.text('SERVICE TAX REG. NO.: AADCG0367LST001', margin, footerY + 30);
-    doc.text('Category of Services:', margin, footerY + 45);
-    doc.text('Technical Testing, Inspection & Certification, Survey and map Making', margin, footerY + 60);
+    const maxFooterY = pageHeight - 30;
+    const footerBoxHeight = 80;
+    const footerBoxStartY = Math.min(Math.max(summaryStartY + 100, 700), maxFooterY - footerBoxHeight);
+    const footerBoxEndY = footerBoxStartY + footerBoxHeight;
+    const footerBoxStartX = margin;
+    const footerBoxEndX = pageWidth - margin;
+    
+    const footerLeftY = footerBoxStartY + 10;
+    doc.fontSize(9).font('Helvetica');
+    doc.text('PAN NO. PAN NO.: AADCG0367L', footerBoxStartX + 5, footerLeftY);
+    doc.text('GST NO.: 24AADCG0367L1ZM', footerBoxStartX + 5, footerLeftY + 12);
+    doc.text('SERVICE TAX REG. NO: AADCG0367LST001', footerBoxStartX + 5, footerLeftY + 24);
+    doc.text('Category of Services:', footerBoxStartX + 5, footerLeftY + 36);
+    doc.text('Technical Testing, Inspection & Certification', footerBoxStartX + 5, footerLeftY + 48);
+    doc.text('Survey and map Making', footerBoxStartX + 5, footerLeftY + 60);
 
     const companyRightX = pageWidth - margin;
-    doc.fontSize(10).font('Helvetica-Bold');
+    doc.fontSize(12).font('Helvetica-Bold');
     const companyName = 'GEO DESIGNS & RESEARCH PVT LTD';
     const companyNameWidth = doc.widthOfString(companyName);
-    doc.text(companyName, companyRightX - companyNameWidth, footerY);
+    doc.text(companyName, companyRightX - companyNameWidth - 5, footerLeftY);
     doc.fontSize(10).font('Helvetica');
     const signatoryText = 'Authorised Signatory';
     const signatoryWidth = doc.widthOfString(signatoryText);
-    doc.text(signatoryText, companyRightX - signatoryWidth, footerY + 20);
+    doc.text(signatoryText, companyRightX - signatoryWidth - 5, footerLeftY + 55);
+
+    doc.rect(footerBoxStartX, footerBoxStartY, footerBoxEndX - footerBoxStartX, footerBoxEndY - footerBoxStartY).stroke();
 
     doc.fontSize(8).font('Helvetica');
-    doc.text(finalInvoiceNo, 50, 820);
+    const pageNumY = Math.min(footerBoxEndY + 10, pageHeight - 20);
+    doc.text(finalInvoiceNo, 50, pageNumY);
     const pageNumWidth = doc.widthOfString('1 of 1');
-    doc.text('1 of 1', pageWidth - 50 - pageNumWidth, 820);
+    doc.text('1 of 1', pageWidth - 50 - pageNumWidth, pageNumY);
   }
 
   private numberToWords(num: number): string {
