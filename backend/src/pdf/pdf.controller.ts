@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, Get, Put, Param, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Res, Get, Put, Delete, Param, Query, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Response } from 'express';
@@ -28,10 +28,10 @@ export class PdfController {
         await reportData.save();
       }
 
-      const pdfBuffer = await this.pdfService.generateReport(data);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename=report.pdf');
-      res.send(pdfBuffer);
+    const pdfBuffer = await this.pdfService.generateReport(data);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=report.pdf');
+    res.send(pdfBuffer);
     } catch (error) {
       throw new HttpException(
         {
@@ -45,9 +45,38 @@ export class PdfController {
   }
 
   @Get('reports')
-  async getAllReports() {
+  async getAllReports(
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+  ) {
     try {
-      const reports = await this.reportModel.find().sort({ createdAt: -1 }).exec();
+      const validSortFields = [
+        'clientCode',
+        'jobNo',
+        'date',
+        'reportDate',
+        'clientName',
+        'address',
+        'gstNo',
+        'city',
+        'contactName',
+        'contactNo',
+        'nameOfWork',
+        'reportNo',
+        'discount',
+        'sgst',
+        'cgst',
+        'createdAt',
+      ];
+
+      let sortCriteria: any = { createdAt: -1 };
+
+      if (sortBy && validSortFields.includes(sortBy)) {
+        const order = sortOrder === 'asc' ? 1 : -1;
+        sortCriteria = { [sortBy]: order };
+      }
+
+      const reports = await this.reportModel.find().sort(sortCriteria).exec();
       return reports;
     } catch (error) {
       throw new HttpException(
@@ -116,6 +145,25 @@ export class PdfController {
         {
           status: HttpStatus.INTERNAL_SERVER_ERROR,
           error: error.message || 'Error generating PDF',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Delete('reports/:id')
+  async deleteReport(@Param('id') id: string) {
+    try {
+      const report = await this.reportModel.findByIdAndDelete(id).exec();
+      if (!report) {
+        throw new HttpException('Report not found', HttpStatus.NOT_FOUND);
+      }
+      return { message: 'Report deleted successfully' };
+    } catch (error) {
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: error.message || 'Error deleting report',
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );

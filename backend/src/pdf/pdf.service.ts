@@ -8,7 +8,8 @@ export class PdfService {
       const doc = new PDFDocument({ 
         margin: 50, 
         size: 'A4',
-        autoFirstPage: true
+        autoFirstPage: true,
+        bufferPages: true
       });
       const buffers: Buffer[] = [];
 
@@ -37,7 +38,8 @@ export class PdfService {
     const pageWidth = 595;
     const pageHeight = 842;
     const margin = 50;
-    const maxTableY = 450;
+    const maxPageY = pageHeight - margin;
+    const maxTableY = Math.min(450, maxPageY - 100);
     
     doc.fontSize(10).font('Helvetica');
     const dateWidth = doc.widthOfString(currentDate);
@@ -134,18 +136,20 @@ export class PdfService {
     const finalTableY = Math.min(yPos, maxTableY);
     doc.moveTo(tableStartX, finalTableY).lineTo(tableEndX, finalTableY).stroke();
 
-    const footerY = Math.min(470, pageHeight - 50);
-    doc.fontSize(10).font('Helvetica');
-    
-    doc.text('Inward Dt:', margin, footerY);
-    doc.text('Testing Dt:', margin + 120, footerY);
-    doc.text('Reporting Dt:', margin + 240, footerY);
-    doc.text('Dispatch Dt:', margin + 360, footerY);
-    
-    doc.text(`Job No: BRD/${jobNo}`, margin, footerY + 20);
-    
-    const pageNumWidth = doc.widthOfString('1 of 1');
-    doc.text('1 of 1', pageWidth - margin - pageNumWidth, footerY + 20);
+    const footerY = Math.min(470, maxPageY - 50);
+    if (footerY + 20 <= maxPageY) {
+      doc.fontSize(10).font('Helvetica');
+      
+      doc.text('Inward Dt:', margin, footerY);
+      doc.text('Testing Dt:', margin + 120, footerY);
+      doc.text('Reporting Dt:', margin + 240, footerY);
+      doc.text('Dispatch Dt:', margin + 360, footerY);
+      
+      doc.text(`Job No: BRD/${jobNo}`, margin, footerY + 20);
+      
+      const pageNumWidth = doc.widthOfString('1 of 1');
+      doc.text('1 of 1', pageWidth - margin - pageNumWidth, footerY + 20);
+    }
   }
 
   private generateProformaInvoicePage(doc: any, data: any) {
@@ -161,6 +165,7 @@ export class PdfService {
     const pageHeight = 842;
     const margin = 50;
     const topY = 50;
+    const maxPageY = pageHeight - margin;
     
     doc.fontSize(16).font('Helvetica-Bold');
     const invoiceTitleWidth = doc.widthOfString('PERFORMA INVOICE');
@@ -189,7 +194,7 @@ export class PdfService {
     currentUnifiedY += (unifiedHeaderRowHeight * 2);
     
     const leftX = margin;
-    const rightX = 300;
+    const rightX = unifiedTableMidX;
     const toContactStartY = currentUnifiedY;
     let tempY = toContactStartY;
     
@@ -228,16 +233,22 @@ export class PdfService {
     
     tempY = toContactStartY;
     if (data.contactName) {
-      doc.text(`Contact name: ${data.contactName}`, rightX + cellPadding, tempY + cellPadding);
-      tempY += 15;
+      const contactNameText = `Contact name: ${data.contactName}`;
+      const contactNameHeight = doc.heightOfString(contactNameText, { width: rightBoxEndX - rightX - (cellPadding * 2) });
+      doc.text(contactNameText, rightX + cellPadding, tempY + cellPadding, { width: rightBoxEndX - rightX - (cellPadding * 2) });
+      tempY += contactNameHeight + 5;
     }
     if (data.contactNo) {
-      doc.text(`Contact No.: ${data.contactNo}`, rightX + cellPadding, tempY + cellPadding);
-      tempY += 15;
+      const contactNoText = `Contact No.: ${data.contactNo}`;
+      const contactNoHeight = doc.heightOfString(contactNoText, { width: rightBoxEndX - rightX - (cellPadding * 2) });
+      doc.text(contactNoText, rightX + cellPadding, tempY + cellPadding, { width: rightBoxEndX - rightX - (cellPadding * 2) });
+      tempY += contactNoHeight + 5;
     }
     if (data.client) {
-      doc.text(`Client: ${data.client || ''}`, rightX + cellPadding, tempY + cellPadding);
-      tempY += 15;
+      const clientText = `Client: ${data.client || ''}`;
+      const clientHeight = doc.heightOfString(clientText, { width: rightBoxEndX - rightX - (cellPadding * 2) });
+      doc.text(clientText, rightX + cellPadding, tempY + cellPadding, { width: rightBoxEndX - rightX - (cellPadding * 2) });
+      tempY += clientHeight + 5;
     }
     
     const refNoText = data.refNo ? `Ref. No. & Date: ${data.refNo} Dtd: ${currentDate}` : `Ref. No. & Date: Dtd: ${currentDate}`;
@@ -259,7 +270,6 @@ export class PdfService {
     doc.moveTo(unifiedTableMidX, unifiedTableStartY).lineTo(unifiedTableMidX, unifiedTableEndY).stroke();
     doc.moveTo(unifiedTableStartX, unifiedTableStartY + (unifiedHeaderRowHeight * 2)).lineTo(unifiedTableEndX, unifiedTableStartY + (unifiedHeaderRowHeight * 2)).stroke();
     doc.moveTo(unifiedTableStartX, unifiedTableStartY + (unifiedHeaderRowHeight * 1)).lineTo(unifiedTableEndX, unifiedTableStartY + (unifiedHeaderRowHeight * 1)).stroke();
-    doc.moveTo(rightX, toContactStartY).lineTo(rightX, nameOfWorkStartY).stroke();
     doc.moveTo(unifiedTableStartX, nameOfWorkStartY).lineTo(unifiedTableEndX, nameOfWorkStartY).stroke();
     doc.moveTo(unifiedTableStartX, unifiedTableStartY).lineTo(unifiedTableStartX, unifiedTableEndY).stroke();
     doc.moveTo(unifiedTableEndX, unifiedTableStartY).lineTo(unifiedTableEndX, unifiedTableEndY).stroke();
@@ -297,7 +307,7 @@ export class PdfService {
     doc.moveTo(tableEndX, headerY).lineTo(tableEndX, headerY + headerRowHeight).stroke();
     doc.moveTo(tableStartX, headerY + headerRowHeight).lineTo(tableEndX, headerY + headerRowHeight).stroke();
 
-    const maxTableY = 580;
+    const maxTableY = Math.min(580, maxPageY - 200);
     let yPos = headerY + headerRowHeight;
     let srNo = 1;
     let subTotal = 0;
@@ -312,44 +322,75 @@ export class PdfService {
         let materialEndY = yPos;
         
         if (material.tests && material.tests.length > 0) {
-          const numTests = material.tests.length;
-          materialEndY = materialStartY + (numTests * 20);
+          doc.fontSize(9).font('Helvetica');
+          
+          const materialText = material.material || '';
+          const materialTextWidth = col3X - col2X - 10;
+          const materialTextHeight = doc.heightOfString(materialText, { width: materialTextWidth });
+          const minMaterialHeight = 20;
+          const actualMaterialHeight = Math.max(materialTextHeight + 10, minMaterialHeight);
+          
+          const testRowHeights: number[] = [];
+          let totalTestRowsHeight = 0;
+          
+          material.tests.forEach((test: string) => {
+            const testText = test || '';
+            const testTextWidth = col4X - col3X - 10;
+            const testTextHeight = doc.heightOfString(testText, { width: testTextWidth });
+            const minTestRowHeight = 20;
+            const actualTestRowHeight = Math.max(testTextHeight + 10, minTestRowHeight);
+            testRowHeights.push(actualTestRowHeight);
+            totalTestRowsHeight += actualTestRowHeight;
+          });
+          
+          materialEndY = materialStartY + Math.max(totalTestRowsHeight, actualMaterialHeight);
           
           if (materialEndY > maxTableY) {
             return;
           }
           
+          const materialTextY = materialStartY + 5;
+          doc.text(materialText, col2X + 5, materialTextY, { width: materialTextWidth });
+          
+          const srNoTextY = materialStartY + ((materialEndY - materialStartY) / 2) - 5;
+          doc.text(`${srNo}`, col1X + 5, srNoTextY, { width: col2X - col1X - 10, align: 'center' });
+          
+          let testYPos = materialStartY;
           material.tests.forEach((test: string, testIndex: number) => {
-            doc.fontSize(9).font('Helvetica');
-            doc.text(test || '', col3X + 5, yPos + 5, { width: col4X - col3X - 10 });
+            const actualTestRowHeight = testRowHeights[testIndex];
+            const testRowEndY = testYPos + actualTestRowHeight;
+            
+            const testText = test || '';
+            const testTextWidth = col4X - col3X - 10;
+            doc.text(testText, col3X + 5, testYPos + 5, { width: testTextWidth });
+            
+            const otherDataY = testYPos + ((actualTestRowHeight) / 2) - 5;
             const qty = material.quantities?.[testIndex] ?? 1;
             const rate = material.rates?.[testIndex] ?? 0;
             const rateWithST = material.ratesWithST?.[testIndex] ?? 0;
-            doc.text(`${qty}`, col4X + 5, yPos + 5, { width: col5X - col4X - 10, align: 'left' });
-            doc.text(`${rate.toFixed(2)}`, col5X + 5, yPos + 5, { width: col6X - col5X - 10, align: 'left' });
-            doc.text(`${rateWithST.toFixed(2)}`, col6X + 5, yPos + 5, { width: col7X - col6X - 10, align: 'left' });
+            doc.text(`${qty}`, col4X + 5, otherDataY, { width: col5X - col4X - 10, align: 'left' });
+            doc.text(`${rate.toFixed(2)}`, col5X + 5, otherDataY, { width: col6X - col5X - 10, align: 'left' });
+            doc.text(`${rateWithST.toFixed(2)}`, col6X + 5, otherDataY, { width: col7X - col6X - 10, align: 'left' });
             
             const amount = rate * qty;
-            doc.text(`${amount.toFixed(2)}`, col7X + 5, yPos + 5, { width: tableEndX - col7X - 10, align: 'left' });
+            doc.text(`${amount.toFixed(2)}`, col7X + 5, otherDataY, { width: tableEndX - col7X - 10, align: 'left' });
             subTotal += amount;
             
-            yPos += 20;
+            testYPos = testRowEndY;
           });
           
-          const materialCenterY = materialStartY + ((materialEndY - materialStartY) / 2);
-          const srNoCenterY = materialCenterY;
-          
-          doc.fontSize(9).font('Helvetica');
-          doc.text(`${srNo}`, col1X + 5, srNoCenterY - 5, { width: col2X - col1X - 10, align: 'center' });
-          doc.text(material.material || '', col2X + 5, materialCenterY - 5, { width: col3X - col2X - 10, align: 'center' });
+          yPos = testYPos;
+          materialEndY = Math.max(materialEndY, testYPos);
           
           doc.moveTo(col1X, materialStartY).lineTo(col1X, materialEndY).stroke();
           doc.moveTo(col2X, materialStartY).lineTo(col2X, materialEndY).stroke();
           doc.moveTo(tableStartX, materialStartY).lineTo(tableStartX, materialEndY).stroke();
           
+          let borderYPos = materialStartY;
           material.tests.forEach((test: string, testIndex: number) => {
-            const rowStartY = materialStartY + (testIndex * 20);
-            const rowEndY = rowStartY + 20;
+            const actualTestRowHeight = testRowHeights[testIndex];
+            const rowStartY = borderYPos;
+            const rowEndY = borderYPos + actualTestRowHeight;
             
             if (testIndex === 0) {
               doc.moveTo(tableStartX, rowStartY).lineTo(tableEndX, rowStartY).stroke();
@@ -362,22 +403,37 @@ export class PdfService {
             doc.moveTo(col7X, rowStartY).lineTo(col7X, rowEndY).stroke();
             doc.moveTo(tableEndX, rowStartY).lineTo(tableEndX, rowEndY).stroke();
             doc.moveTo(col3X, rowEndY).lineTo(tableEndX, rowEndY).stroke();
+            
+            borderYPos = rowEndY;
           });
           
           doc.moveTo(tableStartX, materialEndY).lineTo(tableEndX, materialEndY).stroke();
         } else {
           const rowStartY = yPos;
-          const rowEndY = yPos + 20;
           
           doc.fontSize(9).font('Helvetica');
-          doc.text(`${srNo}`, col1X + 5, yPos + 5, { width: col2X - col1X - 10 });
-          doc.text(material.material || '', col2X + 5, yPos + 5, { width: col3X - col2X - 10 });
-          doc.text('', col3X + 5, yPos + 5, { width: col4X - col3X - 10 });
-          doc.text(`${material.qty || 1}`, col4X + 5, yPos + 5, { width: col5X - col4X - 10, align: 'left' });
-          doc.text(`${(material.rate || 0).toFixed(2)}`, col5X + 5, yPos + 5, { width: col6X - col5X - 10, align: 'left' });
-          doc.text(`${(material.rateWithST || 0).toFixed(2)}`, col6X + 5, yPos + 5, { width: col7X - col6X - 10, align: 'left' });
+          const materialText = material.material || '';
+          const materialTextWidth = col3X - col2X - 10;
+          const materialTextHeight = doc.heightOfString(materialText, { width: materialTextWidth });
+          const minRowHeight = 20;
+          const actualRowHeight = Math.max(materialTextHeight + 10, minRowHeight);
+          const rowEndY = rowStartY + actualRowHeight;
+          
+          if (rowEndY > maxTableY) {
+            return;
+          }
+          
+          const srNoTextY = rowStartY + ((actualRowHeight) / 2) - 5;
+          doc.text(`${srNo}`, col1X + 5, srNoTextY, { width: col2X - col1X - 10, align: 'center' });
+          doc.text(materialText, col2X + 5, rowStartY + 5, { width: materialTextWidth });
+          doc.text('', col3X + 5, rowStartY + 5, { width: col4X - col3X - 10 });
+          
+          const otherTextY = rowStartY + ((actualRowHeight) / 2) - 5;
+          doc.text(`${material.qty || 1}`, col4X + 5, otherTextY, { width: col5X - col4X - 10, align: 'left' });
+          doc.text(`${(material.rate || 0).toFixed(2)}`, col5X + 5, otherTextY, { width: col6X - col5X - 10, align: 'left' });
+          doc.text(`${(material.rateWithST || 0).toFixed(2)}`, col6X + 5, otherTextY, { width: col7X - col6X - 10, align: 'left' });
           const amount = (material.rate || 0) * (material.qty || 1);
-          doc.text(`${amount.toFixed(2)}`, col7X + 5, yPos + 5, { width: tableEndX - col7X - 10, align: 'left' });
+          doc.text(`${amount.toFixed(2)}`, col7X + 5, otherTextY, { width: tableEndX - col7X - 10, align: 'left' });
           subTotal += amount;
           
           doc.moveTo(tableStartX, rowStartY).lineTo(tableEndX, rowStartY).stroke();
@@ -392,7 +448,7 @@ export class PdfService {
           doc.moveTo(tableEndX, rowStartY).lineTo(tableEndX, rowEndY).stroke();
           doc.moveTo(tableStartX, rowEndY).lineTo(tableEndX, rowEndY).stroke();
           
-          yPos += 20;
+          yPos = rowEndY;
         }
         
         srNo++;
@@ -410,11 +466,11 @@ export class PdfService {
     const cgstAmount = (afterDiscount * cgst) / 100;
     const total = Math.max(0, afterDiscount + sgstAmount + cgstAmount);
 
-    const maxContentY = 650;
+    const maxContentY = Math.min(650, maxPageY - 150);
     const finalYPos = Math.min(yPos, maxContentY);
     const summaryStartY = finalYPos + 20;
     
-    if (summaryStartY > maxContentY) {
+    if (summaryStartY > maxContentY || summaryStartY + 150 > maxPageY) {
       return;
     }
     
@@ -453,9 +509,15 @@ export class PdfService {
     const wordsText = `In Words: RUPEES ${this.numberToWords(total)}`;
     doc.text(wordsText, margin, wordsY, { width: summaryLeftX - margin - 30 });
 
-    const maxFooterY = pageHeight - 30;
+    const maxFooterY = pageHeight - margin - 10;
     const footerBoxHeight = 80;
-    const footerBoxStartY = Math.min(Math.max(summaryStartY + 100, 700), maxFooterY - footerBoxHeight);
+    const calculatedFooterY = summaryStartY + 100;
+    const footerBoxStartY = Math.min(Math.max(calculatedFooterY, 700), maxFooterY - footerBoxHeight);
+    
+    if (footerBoxStartY + footerBoxHeight > maxFooterY) {
+      return;
+    }
+    
     const footerBoxEndY = footerBoxStartY + footerBoxHeight;
     const footerBoxStartX = margin;
     const footerBoxEndX = pageWidth - margin;
@@ -479,13 +541,13 @@ export class PdfService {
     const signatoryWidth = doc.widthOfString(signatoryText);
     doc.text(signatoryText, companyRightX - signatoryWidth - 5, footerLeftY + 55);
 
-    doc.rect(footerBoxStartX, footerBoxStartY, footerBoxEndX - footerBoxStartX, footerBoxEndY - footerBoxStartY).stroke();
-
     doc.fontSize(8).font('Helvetica');
-    const pageNumY = Math.min(footerBoxEndY + 10, pageHeight - 20);
-    doc.text(finalInvoiceNo, 50, pageNumY);
-    const pageNumWidth = doc.widthOfString('1 of 1');
-    doc.text('1 of 1', pageWidth - 50 - pageNumWidth, pageNumY);
+    const pageNumY = Math.min(footerBoxEndY + 10, maxFooterY);
+    if (pageNumY <= maxPageY) {
+      doc.text(finalInvoiceNo, 50, pageNumY);
+      const pageNumWidth = doc.widthOfString('1 of 1');
+      doc.text('1 of 1', pageWidth - 50 - pageNumWidth, pageNumY);
+    }
   }
 
   private numberToWords(num: number): string {

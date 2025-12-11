@@ -68,6 +68,9 @@ export default function ReportForm() {
   const [configLoaded, setConfigLoaded] = useState(false);
   const prevTotalPagesRef = useRef(1);
   const [viewPdfId, setViewPdfId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -75,8 +78,13 @@ export default function ReportForm() {
       setConfigLoaded(true);
     };
     loadConfig();
-    fetchReports();
   }, []);
+
+  useEffect(() => {
+    if (configLoaded) {
+      fetchReports();
+    }
+  }, [sortBy, sortOrder, configLoaded]);
 
   useEffect(() => {
     if (configLoaded && pageSize > 0) {
@@ -136,7 +144,11 @@ export default function ReportForm() {
 
   const fetchReports = async () => {
     try {
-      const response = await axios.get('http://localhost:3001/pdf/reports');
+      const params = new URLSearchParams();
+      if (sortBy) params.append('sortBy', sortBy);
+      if (sortOrder) params.append('sortOrder', sortOrder);
+      
+      const response = await axios.get(`http://localhost:3001/pdf/reports?${params.toString()}`);
       if (response.data && response.data.length > 0) {
         setRows((prevRows) => {
           const newRows = response.data;
@@ -325,6 +337,56 @@ export default function ReportForm() {
     }
   };
 
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const getSortIcon = (column: string) => {
+    if (sortBy !== column) {
+      return '⇅';
+    }
+    return sortOrder === 'asc' ? '↑' : '↓';
+  };
+
+  const handleDeleteClick = (reportId: string) => {
+    setDeleteConfirmId(reportId);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmId) return;
+
+    try {
+      await axios.delete(`http://localhost:3001/pdf/reports/${deleteConfirmId}`);
+      setDeleteConfirmId(null);
+      await fetchReports();
+    } catch (error) {
+      console.error('Error deleting report:', error);
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmId(null);
+  };
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && deleteConfirmId) {
+        setDeleteConfirmId(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [deleteConfirmId]);
+
   const getPageNumbers = () => {
     const pages = [];
     const maxVisible = 5;
@@ -357,25 +419,101 @@ export default function ReportForm() {
           <thead>
             <tr style={{ backgroundColor: '#f2f2f2', borderBottom: '2px solid #d0d0d0' }}>
               <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '50px' }}>#</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px' }}>Client Code</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px' }}>Job No</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px' }}>Date</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px' }}>Report Date</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '150px' }}>Client Name</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '150px' }}>Address</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px' }}>GST No</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px' }}>City</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '120px' }}>Contact Name</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px' }}>Contact No</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '150px' }}>Name of Work</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px' }}>Report No</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '80px' }}>Discount %</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '80px' }}>SGST %</th>
-              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '80px' }}>CGST %</th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('clientCode')}
+              >
+                Client Code {getSortIcon('clientCode')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('jobNo')}
+              >
+                Job No {getSortIcon('jobNo')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('date')}
+              >
+                Date {getSortIcon('date')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('reportDate')}
+              >
+                Report Date {getSortIcon('reportDate')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('clientName')}
+              >
+                Client Name {getSortIcon('clientName')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('address')}
+              >
+                Address {getSortIcon('address')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('gstNo')}
+              >
+                GST No {getSortIcon('gstNo')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('city')}
+              >
+                City {getSortIcon('city')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '120px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('contactName')}
+              >
+                Contact Name {getSortIcon('contactName')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('contactNo')}
+              >
+                Contact No {getSortIcon('contactNo')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('nameOfWork')}
+              >
+                Name of Work {getSortIcon('nameOfWork')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('reportNo')}
+              >
+                Report No {getSortIcon('reportNo')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '80px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('discount')}
+              >
+                Discount % {getSortIcon('discount')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '80px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('sgst')}
+              >
+                SGST % {getSortIcon('sgst')}
+              </th>
+              <th 
+                style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '80px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => handleSort('cgst')}
+              >
+                CGST % {getSortIcon('cgst')}
+              </th>
               <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'left', fontWeight: 'bold', minWidth: '120px' }}>Materials</th>
               <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'center', fontWeight: 'bold', minWidth: '80px' }}>Edit</th>
               <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'center', fontWeight: 'bold', minWidth: '100px' }}>Complete</th>
               <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'center', fontWeight: 'bold', minWidth: '80px' }}>View PDF</th>
+              <th style={{ border: '1px solid #d0d0d0', padding: '8px', textAlign: 'center', fontWeight: 'bold', minWidth: '80px' }}>Delete</th>
             </tr>
           </thead>
           <tbody>
@@ -387,136 +525,136 @@ export default function ReportForm() {
                 <tr style={{ backgroundColor: localIndex % 2 === 0 ? '#fff' : '#f9f9f9' }}>
                   <td style={{ border: '1px solid #d0d0d0', padding: '6px', textAlign: 'center' }}>{rowIndex + 1}</td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.clientCode}
-                      onChange={(e) => updateRow(rowIndex, 'clientCode', e.target.value)}
+              <input
+                type="text"
+                value={row.clientCode}
+                onChange={(e) => updateRow(rowIndex, 'clientCode', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.jobNo}
-                      onChange={(e) => updateRow(rowIndex, 'jobNo', e.target.value)}
+              <input
+                type="text"
+                value={row.jobNo}
+                onChange={(e) => updateRow(rowIndex, 'jobNo', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="date"
-                      value={row.date}
-                      onChange={(e) => updateRow(rowIndex, 'date', e.target.value)}
+              <input
+                type="date"
+                value={row.date}
+                onChange={(e) => updateRow(rowIndex, 'date', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="date"
-                      value={row.reportDate}
-                      onChange={(e) => updateRow(rowIndex, 'reportDate', e.target.value)}
+              <input
+                type="date"
+                value={row.reportDate}
+                onChange={(e) => updateRow(rowIndex, 'reportDate', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.clientName}
-                      onChange={(e) => updateRow(rowIndex, 'clientName', e.target.value)}
+              <input
+                type="text"
+                value={row.clientName}
+                onChange={(e) => updateRow(rowIndex, 'clientName', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.address}
-                      onChange={(e) => updateRow(rowIndex, 'address', e.target.value)}
+              <input
+                type="text"
+                value={row.address}
+                onChange={(e) => updateRow(rowIndex, 'address', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.gstNo}
-                      onChange={(e) => updateRow(rowIndex, 'gstNo', e.target.value)}
+              <input
+                type="text"
+                value={row.gstNo}
+                onChange={(e) => updateRow(rowIndex, 'gstNo', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.city}
-                      onChange={(e) => updateRow(rowIndex, 'city', e.target.value)}
+              <input
+                type="text"
+                value={row.city}
+                onChange={(e) => updateRow(rowIndex, 'city', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.contactName}
-                      onChange={(e) => updateRow(rowIndex, 'contactName', e.target.value)}
+              <input
+                type="text"
+                value={row.contactName}
+                onChange={(e) => updateRow(rowIndex, 'contactName', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.contactNo}
-                      onChange={(e) => updateRow(rowIndex, 'contactNo', e.target.value)}
+              <input
+                type="text"
+                value={row.contactNo}
+                onChange={(e) => updateRow(rowIndex, 'contactNo', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.nameOfWork}
-                      onChange={(e) => updateRow(rowIndex, 'nameOfWork', e.target.value)}
+              <input
+                type="text"
+                value={row.nameOfWork}
+                onChange={(e) => updateRow(rowIndex, 'nameOfWork', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="text"
-                      value={row.reportNo}
-                      onChange={(e) => updateRow(rowIndex, 'reportNo', e.target.value)}
+              <input
+                type="text"
+                value={row.reportNo}
+                onChange={(e) => updateRow(rowIndex, 'reportNo', e.target.value)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="number"
-                      value={row.discount}
-                      onChange={(e) => updateRow(rowIndex, 'discount', parseFloat(e.target.value) || 0)}
+              <input
+                type="number"
+                value={row.discount}
+                onChange={(e) => updateRow(rowIndex, 'discount', parseFloat(e.target.value) || 0)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="number"
-                      value={row.sgst}
-                      onChange={(e) => updateRow(rowIndex, 'sgst', parseFloat(e.target.value) || 0)}
+              <input
+                type="number"
+                value={row.sgst}
+                onChange={(e) => updateRow(rowIndex, 'sgst', parseFloat(e.target.value) || 0)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                    />
+              />
                   </td>
                   <td style={{ border: '1px solid #d0d0d0', padding: '0' }}>
-                    <input
-                      type="number"
-                      value={row.cgst}
-                      onChange={(e) => updateRow(rowIndex, 'cgst', parseFloat(e.target.value) || 0)}
+              <input
+                type="number"
+                value={row.cgst}
+                onChange={(e) => updateRow(rowIndex, 'cgst', parseFloat(e.target.value) || 0)}
                       readOnly={!editable}
                       style={{ width: '100%', border: 'none', padding: '6px', outline: 'none', backgroundColor: editable ? 'transparent' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
                     />
@@ -568,100 +706,113 @@ export default function ReportForm() {
                       <span style={{ color: '#999', fontSize: '12px' }}>-</span>
                     )}
                   </td>
+                  <td style={{ border: '1px solid #d0d0d0', padding: '6px', textAlign: 'center' }}>
+                    {row._id ? (
+                      <button
+                        onClick={() => handleDeleteClick(row._id!)}
+                        style={{ padding: '6px 12px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                        title="Delete"
+                      >
+                        Delete
+                      </button>
+                    ) : (
+                      <span style={{ color: '#999', fontSize: '12px' }}>-</span>
+                    )}
+                  </td>
                 </tr>
                 {expandedRow === rowIndex && (
                   <tr>
-                    <td colSpan={19} style={{ border: '1px solid #d0d0d0', padding: '15px', backgroundColor: '#fafafa' }}>
+                    <td colSpan={21} style={{ border: '1px solid #d0d0d0', padding: '15px', backgroundColor: '#fafafa' }}>
                       <div style={{ marginBottom: '10px' }}>
                         <h4 style={{ marginBottom: '10px', fontSize: '14px' }}>Materials:</h4>
-                        {row.materials.map((material, materialIndex) => (
+            {row.materials.map((material, materialIndex) => (
                           <div key={material.id} style={{ border: '1px solid #ddd', padding: '10px', marginBottom: '10px', borderRadius: '4px', backgroundColor: '#fff' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ flex: 1 }}>
                                 <label style={{ fontSize: '12px', marginRight: '5px' }}>Material:</label>
-                                <input
-                                  type="text"
-                                  value={material.material}
+                    <input
+                      type="text"
+                      value={material.material}
                                   onChange={(e) => updateMaterial(rowIndex, materialIndex, 'material', e.target.value)}
                                   readOnly={!editable}
                                   style={{ width: '200px', padding: '4px', border: '1px solid #ccc', borderRadius: '3px', backgroundColor: editable ? 'white' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                                />
-                              </div>
+                    />
+                  </div>
                               {editable && (
-                                <button
-                                  onClick={() => removeMaterial(rowIndex, materialIndex)}
+                  <button
+                    onClick={() => removeMaterial(rowIndex, materialIndex)}
                                   style={{ padding: '4px 8px', backgroundColor: '#ff4444', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}
-                                >
-                                  Remove
-                                </button>
+                  >
+                    Remove
+                  </button>
                               )}
-                            </div>
-                            
-                            <div style={{ marginTop: '10px' }}>
+                </div>
+                
+                <div style={{ marginTop: '10px' }}>
                               {editable && (
-                                <button
-                                  onClick={() => addTest(rowIndex, materialIndex)}
+                  <button
+                    onClick={() => addTest(rowIndex, materialIndex)}
                                   style={{ padding: '4px 8px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', marginBottom: '10px', fontSize: '12px' }}
-                                >
-                                  Add Test
-                                </button>
+                  >
+                    Add Test
+                  </button>
                               )}
-                              
-                              {material.tests.map((test, testIndex) => (
+                  
+                  {material.tests.map((test, testIndex) => (
                                 <div key={testIndex} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-                                  <input
-                                    type="text"
-                                    placeholder="Test Name"
-                                    value={test}
-                                    onChange={(e) => updateTest(rowIndex, materialIndex, testIndex, 'test', e.target.value)}
+                      <input
+                        type="text"
+                        placeholder="Test Name"
+                        value={test}
+                        onChange={(e) => updateTest(rowIndex, materialIndex, testIndex, 'test', e.target.value)}
                                     readOnly={!editable}
                                     style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '3px', fontSize: '12px', backgroundColor: editable ? 'white' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                                  />
-                                  <input
-                                    type="number"
-                                    placeholder="Qty"
-                                    value={material.quantities[testIndex] || ''}
-                                    onChange={(e) => updateTest(rowIndex, materialIndex, testIndex, 'qty', e.target.value)}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Qty"
+                        value={material.quantities[testIndex] || ''}
+                        onChange={(e) => updateTest(rowIndex, materialIndex, testIndex, 'qty', e.target.value)}
                                     readOnly={!editable}
                                     style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '3px', fontSize: '12px', backgroundColor: editable ? 'white' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                                  />
-                                  <input
-                                    type="number"
-                                    placeholder="Rate"
-                                    value={material.rates[testIndex] || ''}
-                                    onChange={(e) => updateTest(rowIndex, materialIndex, testIndex, 'rate', e.target.value)}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Rate"
+                        value={material.rates[testIndex] || ''}
+                        onChange={(e) => updateTest(rowIndex, materialIndex, testIndex, 'rate', e.target.value)}
                                     readOnly={!editable}
                                     style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '3px', fontSize: '12px', backgroundColor: editable ? 'white' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                                  />
-                                  <input
-                                    type="number"
-                                    placeholder="Rate (inc. ST)"
-                                    value={material.ratesWithST[testIndex] || ''}
-                                    onChange={(e) => updateTest(rowIndex, materialIndex, testIndex, 'rateWithST', e.target.value)}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Rate (inc. ST)"
+                        value={material.ratesWithST[testIndex] || ''}
+                        onChange={(e) => updateTest(rowIndex, materialIndex, testIndex, 'rateWithST', e.target.value)}
                                     readOnly={!editable}
                                     style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '3px', fontSize: '12px', backgroundColor: editable ? 'white' : '#f5f5f5', cursor: editable ? 'text' : 'not-allowed' }}
-                                  />
+                      />
                                   {editable && (
-                                    <button
-                                      onClick={() => removeTest(rowIndex, materialIndex, testIndex)}
+                      <button
+                        onClick={() => removeTest(rowIndex, materialIndex, testIndex)}
                                       style={{ padding: '4px 8px', backgroundColor: '#ff4444', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}
-                                    >
-                                      Remove
-                                    </button>
+                      >
+                        Remove
+                      </button>
                                   )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                        
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            
                         {editable && (
-                          <button
-                            onClick={() => addMaterial(rowIndex)}
+            <button
+              onClick={() => addMaterial(rowIndex)}
                             style={{ padding: '6px 12px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}
-                          >
-                            Add Material
-                          </button>
+            >
+              Add Material
+            </button>
                         )}
                       </div>
                     </td>
@@ -742,6 +893,76 @@ export default function ReportForm() {
             </div>
           </div>
         )}
+
+        {deleteConfirmId && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1001,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+            }}
+            onClick={handleDeleteCancel}
+          >
+            <div
+              style={{
+                backgroundColor: 'white',
+                padding: '30px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                maxWidth: '400px',
+                width: '100%',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 'bold', color: '#333' }}>
+                Confirm Delete
+              </h3>
+              <p style={{ margin: '0 0 30px 0', fontSize: '14px', color: '#666' }}>
+                Are you sure you want to delete this report? This action cannot be undone.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  onClick={handleDeleteCancel}
+                  style={{
+                    padding: '8px 20px',
+                    backgroundColor: '#e0e0e0',
+                    color: '#333',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  style={{
+                    padding: '8px 20px',
+                    backgroundColor: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {rows.length > 0 && (
@@ -782,7 +1003,7 @@ export default function ReportForm() {
             </button>
             
             {getPageNumbers().map((page) => (
-              <button
+          <button
                 key={page}
                 onClick={() => handlePageChange(page)}
                 style={{
@@ -797,10 +1018,10 @@ export default function ReportForm() {
                 }}
               >
                 {page}
-              </button>
-            ))}
-            
-            <button
+          </button>
+      ))}
+
+        <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
               style={{
@@ -812,10 +1033,10 @@ export default function ReportForm() {
                 cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
                 fontSize: '12px',
               }}
-            >
+        >
               Next
-            </button>
-            <button
+        </button>
+        <button
               onClick={() => handlePageChange(totalPages)}
               disabled={currentPage === totalPages}
               style={{
@@ -827,10 +1048,10 @@ export default function ReportForm() {
                 cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
                 fontSize: '12px',
               }}
-            >
+        >
               Last
-            </button>
-          </div>
+        </button>
+      </div>
         </div>
       )}
     </div>
